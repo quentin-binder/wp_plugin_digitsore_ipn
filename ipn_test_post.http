@@ -1,0 +1,16 @@
+POST https://staging.freedom4you.de/wp-json/digistore/v1/ipn
+Content-Type: application/json
+
+{
+  "api_mode": "test",
+  "event": "connection_test",
+  "email": "claus@domain-xyz.de",
+  "payment_id": "PAYID-39-22012",
+  "order_id": "273732",
+  "custom" : "user_12",
+  "transaction_amount": "17.00",
+  "transaction_currency": "USD",
+  "sha_sign": "342770076245D14ED7DF4D2E5D82216D7EDF8F9E7969B5964C9C5DCB53E962BBECD545E90422B5329C69554FD8B1A7E7410736615FCA7FB5CBB3624CC016E4BC"
+}
+
+###
