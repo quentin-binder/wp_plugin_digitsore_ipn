@@ -1,6 +1,6 @@
 <?php
 
-class DigiStoreIPN extends WP_REST_Controller
+class CopeCartIPN extends WP_REST_Controller
 {
 
     /**
@@ -8,10 +8,7 @@ class DigiStoreIPN extends WP_REST_Controller
      */
     public function register_routes()
     {
-        $version = '1';
-        $namespace = 'digistore/v' . $version;
-        $base = 'ipn';
-        register_rest_route($namespace, '/' . $base, array(
+        register_rest_route('digistore/v1', '/ipn', array(
             array(
                 'methods' => WP_REST_Server::CREATABLE,
                 'callback' => array($this, 'process_ipn'),
@@ -19,11 +16,42 @@ class DigiStoreIPN extends WP_REST_Controller
                 'args' => array(),
             )
         ));
+        register_rest_route('copecart/v1', '/ipn', array(
+            array(
+                'methods' => WP_REST_Server::ALLMETHODS,
+                'callback' => array($this, 'process_copecart_ipn'),
+                'permission_callback' => array($this, 'permission_check_copecart_ipn'),
+                'args' => array(),
+            )
+        ));
     }
 
-    private const IPN_PASSPHRASE = 'UBRbtPYDhGCpGEQiPbZJzAgOfXZiwPtUTaoJClkx';
+    private
+    const IPN_PASSPHRASE = 'UBRbtPYDhGCpGEQiPbZJzAgOfXZiwPtUTaoJClkx';
 
-    public function permission_check_ipn($request)
+    public function permission_check_copecart_ipn($request)
+    {
+        return true;
+        $parms = $request->get_params();
+        $copecart_signature = $_SERVER['X-Copecart-Signature'];
+        $generated_signature = base64_encode(hash_hmac('sha256', $parms, self::IPN_PASSPHRASE, TRUE));
+        die($generated_signature);
+        if ($copecart_signature == $generated_signature) {
+            // IPN message is varified
+        }
+
+    }
+
+    public function process_copecart_ipn($request)
+    {
+        $parms = $request->get_params();
+        $this->safe_to_db('', '', '', '', $parms);
+        die('OK');
+    }
+
+
+    public
+    function permission_check_ipn($request)
     {
         $parms = $request->get_params();
         $received_signature = $parms['sha_sign'];
@@ -63,7 +91,8 @@ class DigiStoreIPN extends WP_REST_Controller
         die('DB save failed Code: ' . $error_code);
     }
 
-    public function process_ipn($request)
+    public
+    function process_ipn($request)
     {
         $parms = $request->get_params();
         $ipn = new DigiStoreResponse($parms);
@@ -111,7 +140,7 @@ class DigiStoreIPN extends WP_REST_Controller
                         break;
                 }*/
 
-                $email = $ipn->get_param('email');
+
                 /*$first_name = $ipn->get_param('address_first_name');
                 $last_name = $ipn->get_param('address_last_name');
 
@@ -129,7 +158,9 @@ class DigiStoreIPN extends WP_REST_Controller
 
                 // EDIT HERE: Add the php code to store your order in your database
 
-                if ($this->safe_to_db($order_id, $user_id, $email, 'on_payment', $parms)) {
+                $this->change_user_status($user_id, true);
+
+                if ($this->safe_to_db($order_id, $user_id, $ipn->get_user_mail(), 'on_payment', $parms)) {
                     die('OK');
                 } else {
                     $this->db_fail(310);
@@ -139,13 +170,13 @@ class DigiStoreIPN extends WP_REST_Controller
                 if (!$do_transfer_member_ship_data_to_digistore) {
                     die('OK');
                 } else {
-                    $username = get_user_by('ID',$user_id)->user_login;
+                    $username = get_user_by('ID', $user_id)->user_login;
                     $password = '*********';
                     $login_url = get_site_url(null, '/login', 'https');
                     //$thankyou_url = 'http://domain.com/thank_you';
 
                     //$show_on = 'all'; // e.g.: 'all',  'invoice', 'invoice,receipt_page,order_confirmation_email' - seperate multiple targets by comma
-                   // $hide_on = 'invoice'; // e.g.: 'none', 'invoice', 'invoice,receipt_page,order_confirmation_email' - seperate multiple targets by comma
+                    // $hide_on = 'invoice'; // e.g.: 'none', 'invoice', 'invoice,receipt_page,order_confirmation_email' - seperate multiple targets by comma
                     $headline = 'Deine Login Daten:'; // displayed above the membership access data
                     // Add as much data as you like - all data are optional.
                     // If show_on/hide_on is omitted, the data is displayed in any lcation
@@ -223,7 +254,8 @@ headline: $headline");
                 }
             }
 
-            case 'payment_denial':{
+            case 'payment_denial':
+            {
                 $order_id = $ipn->get_param('order_id');
                 $user_mail = $ipn->get_param('email');
 
@@ -301,7 +333,8 @@ headline: $headline");
         }
     }
 
-    public function change_user_status($user_id, $approved = false)
+    public
+    function change_user_status($user_id, $approved = false)
     {
         if (user_can($user_id, 'um_editor_reis') || user_can($user_id, 'um_editor_lion') || user_can($user_id, 'administrator')) {
             die('Has already access');
@@ -317,7 +350,8 @@ headline: $headline");
 
     }
 
-    public function safe_to_db($order_id, $user_id = 0, $email = '', $ipn_event, $params = array())
+    public
+    function safe_to_db($order_id, $user_id = 0, $email = '', $ipn_event, $params = array())
     {
         global $wpdb;
 
@@ -341,7 +375,8 @@ headline: $headline");
         return $wpdb->insert_id;
     }
 
-    public function digistore_signature($sha_passphrase, $parameters, $convert_keys_to_uppercase = false, $do_html_decode = false)
+    public
+    function digistore_signature($sha_passphrase, $parameters, $convert_keys_to_uppercase = false, $do_html_decode = false)
     {
         $algorythm = 'sha512';
         $sort_case_sensitive = true;
@@ -391,6 +426,117 @@ headline: $headline");
 
 }
 
+class CopeCartResponse
+{
+    /**
+     * Store all Parameter for current response
+     *
+     * @var array
+     */
+    protected array $params;
+
+    /**
+     * Event Type
+     *
+     * @var string
+     */
+
+    public string $event_type;
+
+    public string $buyer_mail;
+
+    public string $wp_user_id;
+
+
+    /**
+     * CopeCartResponse constructor.
+     * @param $request
+     */
+
+    public function __construct($request)
+    {
+        $this->params = $request->get_params();
+
+        $this->event_type = $this->params['event_type'];
+        $this->buyer_mail = $this->params['buyer_email'];
+        if(isset($this->params['metadata'])){
+            $this->set_id_by_meta();
+        } else {
+            $this->set_id_by_mail();
+        }
+
+    }
+
+    private function set_id_by_mail()
+    {
+        $user = get_user_by('email', $this->buyer_mail);
+        if ($user) {
+            $this->wp_user_id = $user->ID;
+        } else {
+            $this->wp_user_id = 0;
+        }
+    }
+
+    private function set_id_by_meta(){
+        $decoded_meta = $this->decode($this->params['metadata']);
+        $tmp_id = (int) preg_replace('/\D/', '', $decoded_meta);
+        if (get_userdata($tmp_id) !== false) {
+            $this->wp_user_id = $tmp_id;
+        } else {
+            $this->set_id_by_mail();
+        }
+    }
+
+    private function decode($value) {
+        if (!$value) {
+            return false;
+        }
+
+        $key = sha1('UBRbtPYDhGCpGEQiPbZJzAgOfXZiwPtUTaoJClkx');
+        $strLen = strlen($value);
+        $keyLen = strlen($key);
+        $j = 0;
+        $decrypttext = '';
+
+        for ($i = 0; $i < $strLen; $i += 2) {
+            $ordStr = hexdec(base_convert(strrev(substr($value, $i, 2)), 36, 16));
+            if ($j == $keyLen) {
+                $j = 0;
+            }
+            $ordKey = ord(substr($key, $j, 1));
+            $j++;
+            $decrypttext .= chr($ordStr - $ordKey);
+        }
+
+        return $decrypttext;
+    }
+
+    private function encode($value) {
+        if (!$value) {
+            return false;
+        }
+
+        $key = sha1('UBRbtPYDhGCpGEQiPbZJzAgOfXZiwPtUTaoJClkx');
+        $strLen = strlen($value);
+        $keyLen = strlen($key);
+        $j = 0;
+        $crypttext = '';
+
+        for ($i = 0; $i < $strLen; $i++) {
+            $ordStr = ord(substr($value, $i, 1));
+            if ($j == $keyLen) {
+                $j = 0;
+            }
+            $ordKey = ord(substr($key, $j, 1));
+            $j++;
+            $crypttext .= strrev(base_convert(dechex($ordStr + $ordKey), 16, 36));
+        }
+
+        return $crypttext;
+    }
+
+}
+
 class DigiStoreResponse
 {
     /**
@@ -402,9 +548,12 @@ class DigiStoreResponse
 
     protected int $user_id;
 
-    private function set_id_by_mail($mail){
+    protected string $user_mail;
+
+    private function set_id_by_mail($mail)
+    {
         $user = get_user_by('email', $mail);
-        if($user){
+        if ($user) {
             $this->user_id = $user->ID;
         } else {
             $this->user_id = 0;
@@ -417,17 +566,32 @@ class DigiStoreResponse
         unset($params['SHASIGN']);
         $this->params = $params;
 
-        if(isset($params['custom'])){
-            $tmp_id = (int) preg_replace('/\D/', '', $params['custom']);
-            if(get_userdata( $tmp_id ) !== false){
-                $this->user_id = $tmp_id;
-            } else {
-                $this->set_id_by_mail($params['email']);
-            }
-        } else {
-            $this->set_id_by_mail($params['email']);
+        $email = '';
+        if (isset($params['email'])) {
+            $email = $params['email'];
+        } elseif (isset($params['buyer_email'])) {
+            $email = $params['buyer_email'];
         }
 
+        $this->user_mail = $email;
+        //$params['email'] = isset($params['email']) ? $params['email'] : '-1';
+
+        if (isset($params['custom'])) {
+            $tmp_id = (int)preg_replace('/\D/', '', $params['custom']);
+            if (get_userdata($tmp_id) !== false) {
+                $this->user_id = $tmp_id;
+            } else {
+                $this->set_id_by_mail($email);
+            }
+        } else {
+            $this->set_id_by_mail($email);
+        }
+
+    }
+
+    public function get_user_mail(): string
+    {
+        return $this->user_mail;
     }
 
     /**
@@ -436,7 +600,8 @@ class DigiStoreResponse
      * @return int
      */
 
-    public function get_user_id(): int {
+    public function get_user_id(): int
+    {
         return $this->user_id;
     }
 
